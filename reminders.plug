@@ -1,0 +1,9 @@
+[Core]
+Name = ReminderPlugin
+Module = reminders
+
+[Documentation]
+Description = This module allows you to tell the bot in chat to give you a reminder at some specified time.
+
+[Python]
+Version = 2+
