@@ -1,7 +1,8 @@
 import logging
+import uuid
 from bisect import insort
 from dateutil.parser import parse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from errbot import BotPlugin, botcmd
 from errbot.version import VERSION
@@ -13,6 +14,7 @@ DEFAULT_POLL_INTERVAL = 60 * 5 # Five minutes
 
 class Reminder(object):
     def __init__(self, date, message, target, is_user):
+        self.id = uuid.uuid4().hex
         self.date = date
         self.message = message
         self.target = target
@@ -45,6 +47,7 @@ class Reminder(object):
             message_type=message_type
         )
         self.sent = True
+        bot.store_reminder(self)
 
     def is_ready(self, date=None):
         if date is None:
@@ -81,36 +84,25 @@ class ReminderPlugin(BotPlugin):
             self.send_reminders
         )
 
+    def store_reminder(self, reminder):
+        all_reminders = self.get('all_reminders', {})
+        all_reminders[reminder.id] = reminder
+        self['all_reminders'] = all_reminders
+
     def add_reminder(self, date, message, target, is_user=True):
         new = Reminder(date, message, target, is_user)
-        if is_user:
-            reminder_dict = self.get('user_reminders', {})
-        else:
-            reminder_dict = self.get('chatroom_reminders', {})
-        if target not in reminder_dict:
-            reminder_dict[target] = []
-        insort(reminder_dict[target], new)
-        if is_user:
-            self['user_reminders'] = reminder_dict
-        else:
-            self['chatroom_reminders'] = reminder_dict
+        self.store_reminder(new)
         return new
 
-    def get_reminders(self, target, is_user=True):
-        if is_user:
-            reminder_dict = self.get('user_reminders', {})
-        else:
-            reminder_dict = self.get('chatroom_reminders', {})
-        return reminder_dict.get(target, [])
+    # def get_reminders(self, target, is_user=True):
+    #     if is_user:
+    #         reminder_dict = self.get('user_reminders', {})
+    #     else:
+    #         reminder_dict = self.get('chatroom_reminders', {})
+    #     return reminder_dict.get(target, [])
 
     def get_all_reminders(self):
-        user_reminders = self.get('user_reminders', {})
-        all_reminders = [item for sublist in user_reminders.values() for item in sublist]
-        chatroom_reminders = self.get('chatroom_reminders', {})
-        chat_list = [item for sublist in chatroom_reminders.values() for item in sublist]
-        all_reminders.extend(chat_list)
-        all_reminders.sort()
-        return all_reminders
+        return self.get('all_reminders', {}).values()
 
     def send_reminders(self):
         logging.info('Sending all reminders.')
@@ -143,4 +135,5 @@ class ReminderPlugin(BotPlugin):
         """
         self['user_reminders'] = {}
         self['chatroom_reminders'] = {}
+        self['all_reminders'] = {}
         return 'All reminders have been cleared.'
