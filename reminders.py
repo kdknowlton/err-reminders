@@ -3,6 +3,7 @@ import uuid
 from bisect import insort
 from dateutil.parser import parse
 from datetime import datetime, timedelta
+from pytz import utc
 
 from errbot import BotPlugin, botcmd
 from errbot.version import VERSION
@@ -15,6 +16,8 @@ DEFAULT_POLL_INTERVAL = 60 * 5 # Five minutes
 class Reminder(object):
     def __init__(self, date, message, target, is_user):
         self.id = uuid.uuid4().hex
+        if not date.tzinfo:
+            date = utc.localize(date)
         self.date = date
         self.message = message
         self.target = target
@@ -51,7 +54,7 @@ class Reminder(object):
 
     def is_ready(self, date=None):
         if date is None:
-            date = datetime.now()
+            date = datetime.now(utc)
         return date > self.date and not self.sent
 
 
