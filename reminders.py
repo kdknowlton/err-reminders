@@ -117,6 +117,10 @@ class ReminderPlugin(BotPlugin):
     def reminders_echo(self, mess, args):
         return args
 
+    @botcmd
+    def time(self, mess, args):
+        return "The current local date and time is: {date}".format(datetime.now())
+
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
         if "to" not in args:
