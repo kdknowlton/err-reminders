@@ -16,8 +16,6 @@ DEFAULT_POLL_INTERVAL = 60 * 1 # Five minutes
 class Reminder(object):
     def __init__(self, date, message, target, is_user):
         self.id = uuid.uuid4().hex
-        if not date.tzinfo:
-            date = utc.localize(date)
         self.date = date
         self.message = message
         self.target = target
@@ -120,7 +118,8 @@ class ReminderPlugin(BotPlugin):
 
     @botcmd
     def time(self, mess, args):
-        return "The current local date and time is: " + datetime.now().strftime("%a, %b %d, %Y %H:%M:%S")
+        """Returns the current time in UTC"""
+        return "The current local date and time is: " + datetime.now(utc).strftime("%a, %b %d, %Y %H:%M:%S")
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
@@ -131,7 +130,7 @@ class ReminderPlugin(BotPlugin):
         date_end = args.index('to')
         date_list = args[:date_end]
         date_string = " ".join(date_list)
-        date_struct = ReminderPlugin.cal.parse(date_string)
+        date_struct = ReminderPlugin.cal.parse(date_string, datetime.now(utc).timetuple())
         if ( date_struct[1] != 0 ):
             date = datetime(*(date_struct[0])[:6])
             message = " ".join(args[date_end + 1:])
