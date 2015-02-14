@@ -10,7 +10,7 @@ from errbot.version import VERSION
 
 __author__ = 'kdknowlton'
 
-DEFAULT_POLL_INTERVAL = 60 * 5 # Five minutes
+DEFAULT_POLL_INTERVAL = 60 * 1 # Five minutes
 
 
 class Reminder(object):
@@ -124,18 +124,23 @@ class ReminderPlugin(BotPlugin):
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
+        """Takes a message of the form '!remind me [when] to [what]' and stores the reminder."""
         if "to" not in args:
             return "Sorry, I didn't understand that."
 
         date_end = args.index('to')
         date_list = args[:date_end]
         date_string = " ".join(date_list)
-        date = datetime(*(ReminderPlugin.cal.parse(date_string)[0])[:6])
-        message = " ".join(args[date_end + 1:])
-        is_user = mess.getType() == 'chat'
-        target = mess.getFrom().getStripped()
-        self.add_reminder(date, message, target, is_user)
-        return "Ok, I'll remind you to {message} at {date}.".format(message=message, date=date)
+        date_struct = ReminderPlugin.cal.parse(date_string)
+        if ( date_struct[1] != 0 ):
+            date = datetime(*(date_struct[0])[:6])
+            message = " ".join(args[date_end + 1:])
+            is_user = mess.getType() == 'chat'
+            target = mess.getFrom().getStripped()
+            self.add_reminder(date, message, target, is_user)
+            return "Ok, I'll remind you to {message} at {date}.".format(message=message, date=date)
+        else:
+            return "I'm not sure when {date} is".format(date=date_string)
 
     @botcmd(admin_only=True)
     def clear_all_reminders(self, mess, args):
