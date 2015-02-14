@@ -1,7 +1,6 @@
 import logging
 import uuid
 from bisect import insort
-from dateutil.parser import parse
 from datetime import datetime, timedelta
 from pytz import utc
 import parsedatetime
@@ -131,7 +130,7 @@ class ReminderPlugin(BotPlugin):
         date_end = args.index('to')
         date_list = args[:date_end]
         date_string = " ".join(date_list)
-        date = datetime.datetime(*(ReminderPlugin.cal.parse(date_string)[0])[:6])
+        date = datetime(*(ReminderPlugin.cal.parse(date_string)[0])[:6])
         message = " ".join(args[date_end + 1:])
         is_user = mess.getType() == 'chat'
         target = mess.getFrom().getStripped()
