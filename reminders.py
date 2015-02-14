@@ -119,7 +119,7 @@ class ReminderPlugin(BotPlugin):
 
     @botcmd
     def time(self, mess, args):
-        return "The current local date and time is: {date}".format(datetime.now())
+        return "The current local date and time is: " + datetime.now().strftime("%b %d, %Y %H:%M:%S")
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
