@@ -4,6 +4,7 @@ from bisect import insort
 from dateutil.parser import parse
 from datetime import datetime, timedelta
 from pytz import utc
+import parsedatetime
 
 from errbot import BotPlugin, botcmd
 from errbot.version import VERSION
@@ -60,6 +61,7 @@ class Reminder(object):
 
 class ReminderPlugin(BotPlugin):
     min_err_version = '1.6.0'
+    cal = parsedatetime.Calendar()
 
     def get_configuration_template(self):
         return {'POLL_INTERVAL': DEFAULT_POLL_INTERVAL}
@@ -119,7 +121,7 @@ class ReminderPlugin(BotPlugin):
 
     @botcmd
     def time(self, mess, args):
-        return "The current local date and time is: " + datetime.now().strftime("%b %d, %Y %H:%M:%S")
+        return "The current local date and time is: " + datetime.now().strftime("%a, %b %d, %Y %H:%M:%S")
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
@@ -127,9 +129,9 @@ class ReminderPlugin(BotPlugin):
             return "Sorry, I didn't understand that."
 
         date_end = args.index('to')
-        date_list = args[1:date_end]
+        date_list = args[:date_end]
         date_string = " ".join(date_list)
-        date = parse(date_string)
+        date = datetime.datetime(*(ReminderPlugin.cal.parse(date_string)[0])[:6])
         message = " ".join(args[date_end + 1:])
         is_user = mess.getType() == 'chat'
         target = mess.getFrom().getStripped()
