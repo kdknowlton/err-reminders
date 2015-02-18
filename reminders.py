@@ -3,6 +3,7 @@ import uuid
 from bisect import insort
 from datetime import datetime, timedelta
 from pytz import utc
+import pytz
 import parsedatetime
 
 from errbot import BotPlugin, botcmd
@@ -132,7 +133,7 @@ class ReminderPlugin(BotPlugin):
         date_string = " ".join(date_list)
         date_struct = ReminderPlugin.cal.parse(date_string, datetime.now(utc).timetuple())
         if ( date_struct[1] != 0 ):
-            date = datetime(*(date_struct[0])[:6])
+            date = pytz.utc.localize(datetime(*(date_struct[0])[:6]))
             message = " ".join(args[date_end + 1:])
             is_user = mess.getType() == 'chat'
             target = mess.getFrom().getStripped()
