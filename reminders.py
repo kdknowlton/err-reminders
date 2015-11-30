@@ -1,17 +1,14 @@
 import logging
 import uuid
-from bisect import insort
-from datetime import datetime, timedelta
-from pytz import utc
-import pytz
-import parsedatetime
 
+import parsedatetime
+import pytz
+from datetime import datetime
 from errbot import BotPlugin, botcmd
-from errbot.version import VERSION
 
 __author__ = 'kdknowlton'
 
-DEFAULT_POLL_INTERVAL = 60 * 1 # Five minutes
+DEFAULT_POLL_INTERVAL = 60 * 1  # Five minutes
 
 
 class Reminder(object):
@@ -53,12 +50,12 @@ class Reminder(object):
 
     def is_ready(self, date=None):
         if date is None:
-            date = datetime.now(utc)
+            date = pytz.utc.localize(datetime.now())
         return date > self.date and not self.sent
 
 
 class ReminderPlugin(BotPlugin):
-    min_err_version = '1.6.0'
+    min_err_version = '3.0.0'
     cal = parsedatetime.Calendar()
 
     def get_configuration_template(self):
@@ -112,15 +109,6 @@ class ReminderPlugin(BotPlugin):
         for reminder in self.get_all_reminders():
             if reminder.is_ready():
                 reminder.send(self)
-    
-    @botcmd
-    def reminders_echo(self, mess, args):
-        return args
-
-    @botcmd
-    def time(self, mess, args):
-        """Returns the current time in UTC"""
-        return "The current local date and time is: " + datetime.now(utc).strftime("%a, %b %d, %Y %H:%M:%S")
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
@@ -132,20 +120,19 @@ class ReminderPlugin(BotPlugin):
         date_list = args[:date_end]
         date_string = " ".join(date_list)
         date_struct = ReminderPlugin.cal.parse(date_string, datetime.now(utc).timetuple())
-        if ( date_struct[1] != 0 ):
+        if date_struct[1] != 0:
             date = pytz.utc.localize(datetime(*(date_struct[0])[:6]))
             message = " ".join(args[date_end + 1:])
-            is_user = mess.getType() == 'chat'
-            target = mess.getFrom().getStripped()
+            is_user = mess.type == 'chat'
+            target = mess.frm
             self.add_reminder(date, message, target, is_user)
             return "Ok, I'll remind you to {message} at {date}.".format(message=message, date=date)
         else:
             return "I'm not sure when {date} is".format(date=date_string)
 
     @botcmd(admin_only=True)
-    def clear_all_reminders(self, mess, args):
-        """WARNING: This will clear all reminders for all users and rooms!
-        """
+    def remind_clearall(self, mess, args):
+        """WARNING: This will clear all reminders for all users and rooms!"""
         self['user_reminders'] = {}
         self['chatroom_reminders'] = {}
         self['all_reminders'] = {}
