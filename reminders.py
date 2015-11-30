@@ -1,6 +1,5 @@
 import logging
 import uuid
-
 import parsedatetime
 import pytz
 from datetime import datetime
@@ -9,7 +8,8 @@ from pytz import utc
 
 __author__ = 'kdknowlton'
 
-DEFAULT_POLL_INTERVAL = 60 * 1  # Five minutes
+DEFAULT_POLL_INTERVAL = 60 * 1  # one minute
+DEFAULT_LOCALE = 'de_DE'
 
 
 class Reminder(object):
@@ -55,30 +55,31 @@ class Reminder(object):
         return date > self.date and not self.sent
 
 
-class ReminderPlugin(BotPlugin):
+class RemindMe(BotPlugin):
     min_err_version = '3.0.0'
-    cal = parsedatetime.Calendar()
 
     def get_configuration_template(self):
-        return {'POLL_INTERVAL': DEFAULT_POLL_INTERVAL}
+        return {'POLL_INTERVAL': DEFAULT_POLL_INTERVAL, 'LOCALE': DEFAULT_LOCALE}
 
     def configure(self, configuration):
         if configuration:
             if type(configuration) != dict:
                 raise Exception('Wrong configuration type')
-
-            if not configuration.has_key('POLL_INTERVAL'):
+            if 'POLL_INTERVAL' not in configuration:
                 raise Exception('Wrong configuration type, it should contain POLL_INTERVAL')
-            if len(configuration) > 1:
+            if 'LOCALE' not in configuration:
+                raise Exception('Wrong configuration type, it should contain LOCALE')
+            if len(configuration) > 2:
                 raise Exception('What else did you try to insert in my config ?')
             try:
                 int(configuration['POLL_INTERVAL'])
+                str(configuration['LOCALE'])
             except:
-                raise Exception('POLL_INTERVAL must be an integer')
-        super(ReminderPlugin, self).configure(configuration)
+                raise Exception('Configuration Error')
+        super(RemindMe, self).configure(configuration)
 
     def activate(self):
-        super(ReminderPlugin, self).activate()
+        super(RemindMe, self).activate()
         self.send_reminders()
         self.start_poller(
             self.config['POLL_INTERVAL'] if self.config else DEFAULT_POLL_INTERVAL,
@@ -106,30 +107,30 @@ class ReminderPlugin(BotPlugin):
         return self.get('all_reminders', {}).values()
 
     def send_reminders(self):
-        logging.info('Sending all reminders.')
         for reminder in self.get_all_reminders():
             if reminder.is_ready():
                 reminder.send(self)
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
-        """Takes a message of the form '!remind me [when] to [what]' and stores the reminder."""
-        if "to" not in args:
-            return "Sorry, I didn't understand that."
+        """Takes a message of the form '!remind me [when] of [what]' and stores the reminder. Usage: !remind me <date/time> of <thing>"""
+        if "of" not in args:
+            return "Usage: !remind me <date/time> of <thing>"
 
-        date_end = args.index('to')
+        pdt = parsedatetime.Calendar(parsedatetime.Constants(self.config['LOCALE'] if self.config else DEFAULT_LOCALE))
+        date_end = args.index('of')
         date_list = args[:date_end]
         date_string = " ".join(date_list)
-        date_struct = ReminderPlugin.cal.parse(date_string, datetime.now(utc).timetuple())
+        date_struct = pdt.parse(date_string, datetime.now(utc).timetuple())
         if date_struct[1] != 0:
             date = pytz.utc.localize(datetime(*(date_struct[0])[:6]))
             message = " ".join(args[date_end + 1:])
             is_user = mess.type == 'chat'
             target = mess.frm
             self.add_reminder(date, message, target, is_user)
-            return "Ok, I'll remind you to {message} at {date}.".format(message=message, date=date)
+            return "Reminder set to {message} at {date}.".format(message=message, date=date)
         else:
-            return "I'm not sure when {date} is".format(date=date_string)
+            return "Your date seems malformed: {date}".format(date=date_string)
 
     @botcmd(admin_only=True)
     def remind_clearall(self, mess, args):
