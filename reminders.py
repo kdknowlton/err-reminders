@@ -5,6 +5,9 @@ import pytz
 from datetime import datetime
 from errbot import BotPlugin, botcmd
 from pytz import utc
+import sys
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 __author__ = 'kdknowlton'
 
@@ -43,7 +46,7 @@ class Reminder(object):
         message_type = 'chat' if self.is_user else 'groupchat'
         bot.send(
             self.target,
-            "Hi! You asked me to remind you to {message}".format(message=self.message),
+            "Hello {nick}, here is your reminder: {message}".format(nick=self.target, message=self.message),
             message_type=message_type
         )
         self.sent = True
@@ -113,12 +116,12 @@ class RemindMe(BotPlugin):
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
-        """Takes a message of the form '!remind me [when] of [what]' and stores the reminder. Usage: !remind me <date/time> of <thing>"""
-        if "of" not in args:
-            return "Usage: !remind me <date/time> of <thing>"
+        """Takes a message of the form '!remind me [when] -> [what]' and stores the reminder. Usage: !remind me <date/time> -> <thing>"""
+        if "->" not in args:
+            return "Usage: !remind me <date/time> -> <thing>"
 
         pdt = parsedatetime.Calendar(parsedatetime.Constants(self.config['LOCALE'] if self.config else DEFAULT_LOCALE))
-        date_end = args.index('of')
+        date_end = args.index('->')
         date_list = args[:date_end]
         date_string = " ".join(date_list)
         date_struct = pdt.parse(date_string, datetime.now(utc).timetuple())
@@ -128,7 +131,7 @@ class RemindMe(BotPlugin):
             is_user = mess.type == 'chat'
             target = mess.frm
             self.add_reminder(date, message, target, is_user)
-            return "Reminder set to {message} at {date}.".format(message=message, date=date)
+            return "Reminder set to \"{message}\" at {date}.".format(message=message, date=date)
         else:
             return "Your date seems malformed: {date}".format(date=date_string)
 
