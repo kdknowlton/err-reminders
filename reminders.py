@@ -1,4 +1,3 @@
-import logging
 import uuid
 import parsedatetime
 import pytz
@@ -6,64 +5,19 @@ from datetime import datetime
 from errbot import BotPlugin, botcmd
 from pytz import utc
 import sys
+
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-__author__ = 'kdknowlton'
+__author__ = 'kdknowlton, Betriebsrat'
 
 DEFAULT_POLL_INTERVAL = 60 * 1  # one minute
-DEFAULT_LOCALE = 'de_DE'
-
-
-class Reminder(object):
-    def __init__(self, date, message, target, is_user):
-        self.id = uuid.uuid4().hex
-        self.date = date
-        self.message = message
-        self.target = target
-        self.is_user = is_user
-        self.sent = False
-
-    def __lt__(self, other):
-        if hasattr(other, 'date'):
-            return self.date < other.date
-        else:
-            raise NotImplemented
-
-    def __gt__(self, other):
-        if hasattr(other, 'date'):
-            return self.date > other.date
-        else:
-            raise NotImplemented
-
-    def send(self, bot):
-        logging.info(
-            'Sending reminder to {target}:\n{message}'.format(
-                target=self.target,
-                message=self.message
-            )
-        )
-        message_type = 'chat' if self.is_user else 'groupchat'
-        bot.send(
-            self.target,
-            "Hello {nick}, here is your reminder: {message}".format(nick=self.target, message=self.message),
-            message_type=message_type
-        )
-        self.sent = True
-        bot.store_reminder(self)
-
-    def is_ready(self, date=None):
-        if date is None:
-            date = pytz.utc.localize(datetime.now())
-        return date > self.date and not self.sent
-
+DEFAULT_LOCALE = 'de_DE' # CHANGE THIS TO YOUR LOCALE
 
 class RemindMe(BotPlugin):
     min_err_version = '3.0.0'
 
-    def get_configuration_template(self):
-        return {'POLL_INTERVAL': DEFAULT_POLL_INTERVAL, 'LOCALE': DEFAULT_LOCALE}
-
+    # Configuration
     def configure(self, configuration):
         if configuration:
             if type(configuration) != dict:
@@ -81,6 +35,9 @@ class RemindMe(BotPlugin):
                 raise Exception('Configuration Error')
         super(RemindMe, self).configure(configuration)
 
+    def get_configuration_template(self):
+        return {'POLL_INTERVAL': DEFAULT_POLL_INTERVAL, 'LOCALE': DEFAULT_LOCALE}
+
     def activate(self):
         super(RemindMe, self).activate()
         self.send_reminders()
@@ -91,28 +48,44 @@ class RemindMe(BotPlugin):
 
     def store_reminder(self, reminder):
         all_reminders = self.get('all_reminders', {})
-        all_reminders[reminder.id] = reminder
+        all_reminders[reminder['id']] = reminder
         self['all_reminders'] = all_reminders
 
     def add_reminder(self, date, message, target, is_user=True):
-        new = Reminder(date, message, target, is_user)
-        self.store_reminder(new)
-        return new
+        reminder = {
+            "id": uuid.uuid4().hex,
+            "date": date,
+            "message": message,
+            "target": target,
+            "is_user": is_user,
+            "sent": False
+        }
+        self.store_reminder(reminder)
+        return reminder
 
-    # def get_reminders(self, target, is_user=True):
-    #     if is_user:
-    #         reminder_dict = self.get('user_reminders', {})
-    #     else:
-    #         reminder_dict = self.get('chatroom_reminders', {})
-    #     return reminder_dict.get(target, [])
+    def remove_reminder(self, id):
+        all_reminders = self.get('all_reminders', {})
+        del all_reminders[id]
+        self['all_reminders'] = all_reminders
 
     def get_all_reminders(self):
         return self.get('all_reminders', {}).values()
 
     def send_reminders(self):
         for reminder in self.get_all_reminders():
-            if reminder.is_ready():
-                reminder.send(self)
+            if pytz.utc.localize(datetime.now()) > reminder['date'] and not reminder['sent']:
+                message_type = 'chat' if reminder['is_user'] else 'groupchat'
+                self.send(
+                    reminder['target'],
+                    "Hello {nick}, here is your reminder: {message}".format(nick=reminder['target'],
+                                                                            message=reminder['message']),
+                    message_type=message_type
+                )
+                all_reminders = self.get('all_reminders', {})
+                all_reminders[reminder['id']]['sent'] = True
+                self['all_reminders'] = all_reminders
+            elif reminder['sent']  == True:
+                self.remove_reminder(reminder['id'])
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
