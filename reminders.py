@@ -1,86 +1,45 @@
-import logging
 import uuid
-from bisect import insort
-from dateutil.parser import parse
-from datetime import datetime, timedelta
-from pytz import utc
-
+import parsedatetime
+import pytz
+from datetime import datetime
 from errbot import BotPlugin, botcmd
-from errbot.version import VERSION
+from pytz import utc
+import sys
 
-__author__ = 'kdknowlton'
+reload(sys)
+sys.setdefaultencoding('utf8')
 
-DEFAULT_POLL_INTERVAL = 60 * 5 # Five minutes
+__author__ = 'kdknowlton, Betriebsrat'
 
+DEFAULT_POLL_INTERVAL = 60 * 1  # one minute
+DEFAULT_LOCALE = 'de_DE' # CHANGE THIS TO YOUR LOCALE
 
-class Reminder(object):
-    def __init__(self, date, message, target, is_user):
-        self.id = uuid.uuid4().hex
-        if not date.tzinfo:
-            date = utc.localize(date)
-        self.date = date
-        self.message = message
-        self.target = target
-        self.is_user = is_user
-        self.sent = False
+class RemindMe(BotPlugin):
+    min_err_version = '3.0.0'
 
-    def __lt__(self, other):
-        if hasattr(other, 'date'):
-            return self.date < other.date
-        else:
-            raise NotImplemented
-
-    def __gt__(self, other):
-        if hasattr(other, 'date'):
-            return self.date > other.date
-        else:
-            raise NotImplemented
-
-    def send(self, bot):
-        logging.info(
-            'Sending reminder to {target}:\n{message}'.format(
-                target=self.target,
-                message=self.message
-            )
-        )
-        message_type = 'chat' if self.is_user else 'groupchat'
-        bot.send(
-            self.target,
-            "Hi! You asked me to remind you to {message}".format(message=self.message),
-            message_type=message_type
-        )
-        self.sent = True
-        bot.store_reminder(self)
-
-    def is_ready(self, date=None):
-        if date is None:
-            date = datetime.now(utc)
-        return date > self.date and not self.sent
-
-
-class ReminderPlugin(BotPlugin):
-    min_err_version = '1.6.0'
-
-    def get_configuration_template(self):
-        return {'POLL_INTERVAL': DEFAULT_POLL_INTERVAL}
-
+    # Configuration
     def configure(self, configuration):
         if configuration:
             if type(configuration) != dict:
                 raise Exception('Wrong configuration type')
-
-            if not configuration.has_key('POLL_INTERVAL'):
+            if 'POLL_INTERVAL' not in configuration:
                 raise Exception('Wrong configuration type, it should contain POLL_INTERVAL')
-            if len(configuration) > 1:
+            if 'LOCALE' not in configuration:
+                raise Exception('Wrong configuration type, it should contain LOCALE')
+            if len(configuration) > 2:
                 raise Exception('What else did you try to insert in my config ?')
             try:
                 int(configuration['POLL_INTERVAL'])
+                str(configuration['LOCALE'])
             except:
-                raise Exception('POLL_INTERVAL must be an integer')
-        super(ReminderPlugin, self).configure(configuration)
+                raise Exception('Configuration Error')
+        super(RemindMe, self).configure(configuration)
+
+    def get_configuration_template(self):
+        return {'POLL_INTERVAL': DEFAULT_POLL_INTERVAL, 'LOCALE': DEFAULT_LOCALE}
 
     def activate(self):
-        super(ReminderPlugin, self).activate()
+        super(RemindMe, self).activate()
         self.send_reminders()
         self.start_poller(
             self.config['POLL_INTERVAL'] if self.config else DEFAULT_POLL_INTERVAL,
@@ -89,57 +48,69 @@ class ReminderPlugin(BotPlugin):
 
     def store_reminder(self, reminder):
         all_reminders = self.get('all_reminders', {})
-        all_reminders[reminder.id] = reminder
+        all_reminders[reminder['id']] = reminder
         self['all_reminders'] = all_reminders
 
     def add_reminder(self, date, message, target, is_user=True):
-        new = Reminder(date, message, target, is_user)
-        self.store_reminder(new)
-        return new
+        reminder = {
+            "id": uuid.uuid4().hex,
+            "date": date,
+            "message": message,
+            "target": target,
+            "is_user": is_user,
+            "sent": False
+        }
+        self.store_reminder(reminder)
+        return reminder
 
-    # def get_reminders(self, target, is_user=True):
-    #     if is_user:
-    #         reminder_dict = self.get('user_reminders', {})
-    #     else:
-    #         reminder_dict = self.get('chatroom_reminders', {})
-    #     return reminder_dict.get(target, [])
+    def remove_reminder(self, id):
+        all_reminders = self.get('all_reminders', {})
+        del all_reminders[id]
+        self['all_reminders'] = all_reminders
 
     def get_all_reminders(self):
         return self.get('all_reminders', {}).values()
 
     def send_reminders(self):
-        logging.info('Sending all reminders.')
         for reminder in self.get_all_reminders():
-            if reminder.is_ready():
-                reminder.send(self)
-    
-    @botcmd
-    def reminders_echo(self, mess, args):
-        return args
-
-    @botcmd
-    def time(self, mess, args):
-        return "The current local date and time is: {date}".format(datetime.now())
+            if pytz.utc.localize(datetime.now()) > reminder['date'] and not reminder['sent']:
+                message_type = 'chat' if reminder['is_user'] else 'groupchat'
+                self.send(
+                    reminder['target'],
+                    "Hello {nick}, here is your reminder: {message}".format(nick=reminder['target'],
+                                                                            message=reminder['message']),
+                    message_type=message_type
+                )
+                all_reminders = self.get('all_reminders', {})
+                all_reminders[reminder['id']]['sent'] = True
+                self['all_reminders'] = all_reminders
+            elif reminder['sent']  == True:
+                self.remove_reminder(reminder['id'])
 
     @botcmd(split_args_with=' ')
     def remind_me(self, mess, args):
-        if "to" not in args:
-            return "Sorry, I didn't understand that."
+        """Takes a message of the form '!remind me [when] -> [what]' and stores the reminder. Usage: !remind me <date/time> -> <thing>"""
+        if "->" not in args:
+            return "Usage: !remind me <date/time> -> <thing>"
 
-        date_end = args.index('to')
-        date_list = args[1:date_end]
+        pdt = parsedatetime.Calendar(parsedatetime.Constants(self.config['LOCALE'] if self.config else DEFAULT_LOCALE))
+        date_end = args.index('->')
+        date_list = args[:date_end]
         date_string = " ".join(date_list)
-        date = parse(date_string)
-        message = " ".join(args[date_end + 1:])
-        is_user = mess.getType() == 'chat'
-        target = mess.getFrom().getStripped()
-        self.add_reminder(date, message, target, is_user)
-        return "Ok, I'll remind you to {message} at {date}.".format(message=message, date=date)
+        date_struct = pdt.parse(date_string, datetime.now(utc).timetuple())
+        if date_struct[1] != 0:
+            date = pytz.utc.localize(datetime(*(date_struct[0])[:6]))
+            message = " ".join(args[date_end + 1:])
+            is_user = mess.type == 'chat'
+            target = mess.frm
+            self.add_reminder(date, message, target, is_user)
+            return "Reminder set to \"{message}\" at {date}.".format(message=message, date=date)
+        else:
+            return "Your date seems malformed: {date}".format(date=date_string)
 
     @botcmd(admin_only=True)
-    def clear_all_reminders(self, mess, args):
-        """WARNING: This will clear all reminders for all users and rooms!
-        """
+    def remind_clearall(self, mess, args):
+        """WARNING: This will clear all reminders for all users and rooms!"""
         self['user_reminders'] = {}
         self['chatroom_reminders'] = {}
         self['all_reminders'] = {}
