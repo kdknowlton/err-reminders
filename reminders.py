@@ -4,16 +4,13 @@ import pytz
 from datetime import datetime
 from errbot import BotPlugin, botcmd
 from pytz import utc
-from imp import reload
-import sys
+from __future__ import unicode_literals
 
-reload(sys)
-sys.setdefaultencoding('utf8')
 
 __author__ = 'kdknowlton, Betriebsrat'
 
 DEFAULT_POLL_INTERVAL = 60 * 1  # one minute
-DEFAULT_LOCALE = 'de_DE' # CHANGE THIS TO YOUR LOCALE
+DEFAULT_LOCALE = 'en_US' # CHANGE THIS TO YOUR LOCALE
 
 class RemindMe(BotPlugin):
     min_err_version = '3.0.0'
