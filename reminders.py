@@ -4,6 +4,7 @@ import pytz
 from datetime import datetime
 from errbot import BotPlugin, botcmd
 from pytz import utc
+from imp import reload
 import sys
 
 reload(sys)
