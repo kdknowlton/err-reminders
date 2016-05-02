@@ -1,10 +1,11 @@
+from __future__ import unicode_literals
+
 import uuid
 import parsedatetime
 import pytz
 from datetime import datetime
 from errbot import BotPlugin, botcmd
 from pytz import utc
-from __future__ import unicode_literals
 
 
 __author__ = 'kdknowlton, Betriebsrat'
