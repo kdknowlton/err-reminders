@@ -1,0 +1,2 @@
+pytz==2021.3
+parsedatetime==2.6

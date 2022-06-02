@@ -73,12 +73,10 @@ class RemindMe(BotPlugin):
     def send_reminders(self):
         for reminder in self.get_all_reminders():
             if pytz.utc.localize(datetime.now()) > reminder['date'] and not reminder['sent']:
-                message_type = 'chat' if reminder['is_user'] else 'groupchat'
                 self.send(
                     reminder['target'],
                     "Hello {nick}, here is your reminder: {message}".format(nick=reminder['target'],
                                                                             message=reminder['message']),
-                    message_type=message_type
                 )
                 all_reminders = self.get('all_reminders', {})
                 all_reminders[reminder['id']]['sent'] = True
@@ -100,7 +98,7 @@ class RemindMe(BotPlugin):
         if date_struct[1] != 0:
             date = pytz.utc.localize(datetime(*(date_struct[0])[:6]))
             message = " ".join(args[date_end + 1:])
-            is_user = mess.type == 'chat'
+            is_user = not mess.is_group
             target = mess.frm
             self.add_reminder(date, message, target, is_user)
             return "Reminder set to \"{message}\" at {date}.".format(message=message, date=date)

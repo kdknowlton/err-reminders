@@ -1,6 +1,8 @@
 err-reminders
 =============
 
+This was forked to solve compatability issues with the latest version of errbot.
+
 ErrBot plugin to get and set scheduled reminders over chat.  
 You NEED to change the locale, if you are not from germany.  
 
